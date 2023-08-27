@@ -14,6 +14,13 @@ const getInitCameraState = (
         z[i] = z[i] || 0;
     }
 
+    [x, y, z, ...rest] = gramSchmidt(
+        x, y, z, 
+        ...Array(dimensions - 3)
+            .fill(0)
+            .map((_, i) => Array(dimensions).fill(0).map((_, j) => (i+3 == j) ? 1 : 0))
+    );
+
     console.log("Vectors:", x, y, z);
     console.log("dot:", math.dot(x, y), math.dot(x, z), math.dot(y, z))
 
@@ -23,6 +30,7 @@ const getInitCameraState = (
         x,
         y,
         z,
+        rest,
         position: z.map(x => -2 * x),
 
         initialDepth: 0,
@@ -30,7 +38,7 @@ const getInitCameraState = (
         maxDepth: 4,
         opacityLayers: 1,
         zoom: 1,
-        flags: cameraStateFlags.border
+        flags: !cameraStateFlags.border
     }
 }
 

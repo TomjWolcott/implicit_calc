@@ -41,16 +41,21 @@ const wgsl = () => {
         struct DepthInfo {
             percent_depth: f32,
             intersected_id: u32
+            // info: vec2<u32>
+            // split up into camera_state.opacity_layers pieces with each piece 
+            // having 4 bits for an id of the intersected eq and the rest for the percent depth
         }
+
+        // example with camera_state.opactiy_layers = 3;
+        // 21 bits each with one left over, each section has for 4 bits for the id and a depth percent 
+        // 0001 00001000000000111  0010 00101100001010010  0000 00000000000000000  0
 
         @group(0) @binding(1) var<storage, read_write> depth_info: array<DepthInfo>;
 
         @compute @workgroup_size(${rendererInfo.workgroupSize}, ${rendererInfo.workgroupSize}) // arbitrary choice
         fn calculate_depths(@builtin(global_invocation_id) global_id: vec3<u32>) {
-            // if (global_id.x >= u32(camera_state.width) || global_id.y >= u32(camera_state.width)) {
-            //     return;
-            // }
-
+            let perspective_dist: f32 = 3.0;
+            let global_index = global_id.x + global_id.y * u32(camera_state.width);
             var d: f32 = camera_state.initial_depth;
             let scale = min(camera_state.width, camera_state.height);
             let norm_pos = vec4(f32(global_id.x) / scale, f32(global_id.y) / scale, 0, 0);
@@ -62,28 +67,52 @@ const wgsl = () => {
             } else {
                 centered_pos = 2 * norm_pos - vec4(1, camera_state.height / camera_state.width, 0, 0);
             }
+
+            ${indices.map(i => `let pixel_pos${i}: f32 = 
+                camera_state.zoom * camera_state.x${i} * centered_pos.x + 
+                camera_state.zoom * camera_state.y${i} * centered_pos.y +
+                camera_state.p${i};
+            `).join("\n" + "    ".repeat(4))}
+
+            let ray_length: f32 = pow(${indices.map(i => `pow(
+                camera_state.zoom * camera_state.x${i} * centered_pos.x + 
+                camera_state.zoom * camera_state.y${i} * centered_pos.y +
+                camera_state.z${i} * perspective_dist
+            , 2)`).join("+")}, 0.5);
+
+            ${indices.map(i => `let ray${i}: f32 = (
+                camera_state.zoom * camera_state.x${i} * centered_pos.x + 
+                camera_state.zoom * camera_state.y${i} * centered_pos.y +
+                camera_state.z${i} * perspective_dist
+            ) / ray_length;`).join("\n" + "    ".repeat(4))}
+
+            var increment_depth: f32 = camera_state.increment_depth;
+
+            // if (depth_info[global_index].percent_depth > 0.99) {
+            //     increment_depth *= 500000;
+            // }
             
             ${eqEnviroment.implicitEquations.map((_, i) => `var prev_difference${i}: f32 = 0;`).join("\n\n")}
 
+            // let size = u32(64 / camera_state.opacity_layers);
+            // var info: vec2<f32> = vec2(0, 0);
+            // var in_a_row: bool = false;
+            // var opacity_layers_used: u32 = 0;
+
             loop {
                 ${indices.map(i => `let t${i}: f32 = 
-                    camera_state.zoom * camera_state.x${i} * centered_pos.x + 
-                    camera_state.zoom * camera_state.y${i} * centered_pos.y +
-                    camera_state.z${i} * d +
-                    camera_state.p${i};
+                    pixel_pos${i} + ray${i} * d;
                 `).join("\n" + "    ".repeat(4))}
-
-                ${eqEnviroment.implicitEquations.map(({ name1, name2 }) => `
-                    let ${name1}_test = ${name1}(${indices.map(i => `t${i}`).join(",")});
-                    let ${name2}_test = ${name2}(${indices.map(i => `t${i}`).join(",")});
-                `).join("\n\n")}
 
                 if d >= camera_state.max_depth { 
                     intersected_id = 0;
                     break;
                 }
 
-                ${eqEnviroment.implicitEquations.map(({ test }, i) => `
+                ${eqEnviroment.implicitEquations.map(({ test, name1, name2 }, i) => `
+                    let ${name1}_test = ${name1}(${indices.map(i => `t${i}`).join(",")});
+                    let ${name2}_test = ${name2}(${indices.map(i => `t${i}`).join(",")});
+
                     if (${test}) {
                         intersected_id = ${i + 1};
                         break;
@@ -94,16 +123,22 @@ const wgsl = () => {
                     prev_difference${i} = sign(${name1}_test - ${name2}_test);
                 `).join("\n\n")}
 
-                d += camera_state.increment_depth;
+                d += increment_depth;
             }
-
-            let global_index = global_id.x + global_id.y * u32(camera_state.width);
 
             depth_info[global_index] = DepthInfo(
                 (d - camera_state.initial_depth) / (camera_state.max_depth - camera_state.initial_depth),
                 intersected_id
             );
         }
+
+        // fn add_to_info(intersection_id: u32, depth: f32, layer_index: u32, info: ptr<function, vec2<f32>>) {
+        //     let size = u32(64 / camera_state.opacity_layers);
+
+        //     (*info).x = (*info).x | 
+        //         ((intersection_id & 15) << (layer_index * size)) | 
+        //         ((u32(depth * pow(2, size - 4)) & 0xfffffff0) << (layer_index * size))
+        // }
 
         @vertex
         fn vertex_main(@location(0) pos: vec2<f32>) -> @builtin(position) vec4<f32> {
@@ -120,8 +155,21 @@ const wgsl = () => {
             } else if ((camera_state.flags) > 0 && is_border(pos.x, pos.y)) {
                 return border_color;
             } else {
+                let stripe_freq = 1000;
+                let x = 100 * (my_depth_info.percent_depth + (camera_state.time / 400000));
+
                 return eq_colors[my_depth_info.intersected_id - 1] - 
-                    round((cos(1000 * (my_depth_info.percent_depth + (camera_state.time / 400000)))+1) / 2) * vec4(0.05, 0.05, 0.05, 0);
+                    stripe(x, 1, 0.5) * vec4(0.05, 0.05, 0.05, 0) -  
+                    stripe(x, 10, 0.5) * vec4(0.15, 0.15, 0.15, 0) -
+                    (2 * my_depth_info.percent_depth - 1) * vec4(0.2, 0.2, 0.2, 0);
+            }
+        }
+
+        fn stripe(x: f32, period: f32, length: f32) -> f32 {
+            if (x % period + length > period) {
+                return 1.0;
+            } else {
+                return 0.0;
             }
         }
 
@@ -149,6 +197,8 @@ const wgsl = () => {
         fn get_depth_info(x: f32, y: f32) -> DepthInfo {
             return depth_info[u32(x) + u32(y) * u32(camera_state.width)];
         }
+
+        ${eqEnviroment.definitions.map(({ fn }) => fn).join("\n\n")}
 
         ${eqEnviroment.implicitEquations.map(({ f1, f2 }) => f1 + "\n" + f2).join("\n\n")}
     `.replaceAll("\n        ", "\n");

@@ -1,7 +1,9 @@
 rendererInfo = { 
     loaded: false,
-    scale: 1/2
+    scale: 3/4
 };
+
+let depthInfoData;
 
 const prepareRenderer = async () => {
     const canvas = document.querySelector("canvas");
@@ -58,16 +60,18 @@ const prepareRenderer = async () => {
         }]
     });
 
+    depthInfoData = new Float32Array(Array(2 * canvas.width * canvas.height).fill(0));
+
     rendererInfo = {
         ...rendererInfo,
         loaded: true,
         canvas,
         device,
         canvasFormat,
-        vertexBuffer,
         vertexBufferLayout,
+        vertexBuffer,
         bindGroupLayout,
-        workgroupSize: 1
+        workgroupSize: 16,
     };
 
     loadWgsl();
@@ -124,6 +128,14 @@ const render = async () => {
     if (!loaded) return;
 
     let canvasBoundingBox = canvas.getBoundingClientRect();
+
+    if (
+        canvas.width != scale * canvasBoundingBox.width || 
+        canvas.height != scale * canvasBoundingBox.height
+    ) depthInfoData = new Float32Array(Array(Math.ceil(
+        2 * (scale**2) * canvasBoundingBox.width * canvasBoundingBox.height
+    )).fill(0));
+
     canvas.width = scale * canvasBoundingBox.width;
     canvas.height = scale * canvasBoundingBox.height;
 
@@ -151,8 +163,6 @@ const render = async () => {
     });
 
     await device.queue.writeBuffer(cameraStateBuffer, 0, cameraStateData);
-
-    const depthInfoData = new Float32Array(Array(2 * canvas.width * canvas.height).fill(0));
 
     const depthInfoBuffer = device.createBuffer({
         label: "depth info buffer",
@@ -205,6 +215,7 @@ const render = async () => {
     renderPass.end();
     
     await device.queue.submit([computeEncoder.finish(), encoder.finish()]);
+
 }
 
 prepareRenderer().then(() => render());

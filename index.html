@@ -14,6 +14,12 @@
             crossorigin="anonymous" referrerpolicy="no-referrer"
         ></script>
         <script src="https://unpkg.com/@cortex-js/compute-engine"></script>
+        <script 
+            src="https://cdnjs.cloudflare.com/ajax/libs/mathquill/0.9.1/mathquill.min.js" 
+            integrity="sha512-nrkcp3u2ytFW9WsmuD0JwlIhY6ZDCfL8+vd9cofdsl7m4XvmCR+DCvhvq0Zuhg69rGLsASKfYgcJKvyh6dyf0A==" 
+            crossorigin="anonymous" referrerpolicy="no-referrer"
+        ></script>
+        <script src="https://cdn.jsdelivr.net/npm/evaluatex@2.2.0/dist/evaluatex.min.js"></script>
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
             body, html {
@@ -47,8 +53,7 @@
         </style>
     </head>
     <body class="flex flex-row">
-        <button></button>
-        <div class="flex flex-col overflow-y-scroll m-0 p-5 w-fit h-100 z-20 bg-slate-200 sidebar">
+        <div class="flex flex-col overflow-y-scroll m-0 p-5 w-fit h-100 z-20 sidebar">
             <h1>Equations</h1>
             <hr>
             <div class="w-full eqInputs"></div>
@@ -57,19 +62,36 @@
                 onclick="addEq()"
             ><span>+</span></button>
             <br>
-            <h1>Provided variables</h1>
+            <h1>Slice Definition</h1>
             <hr>
             <math-field class="sliceDefinition" read-only></math-field>
             <br>
             <h1>Edit Slice</h1>
             <hr>
-            <span>TBD...</span>
+            <div class="w-full h-fit">
+                <div class="z-20">
+                    Axis 1: <select class="axis1"></select> &nbsp; 
+                    Axis 2: <select class="axis2"></select>
+                </div>
+                <br>
+                <img 
+                    src="circle.png" id="rotator" class="hover:saturate-50" 
+                    style="width: 200px; position: relative; user-select: none;" draggable="false" 
+                />
+            </div>
         </div>
         <div class="m-0 p-0 flex-1 relative">
-            <h1 class="absolute left-0 top-0 text-white">
-            <button class="m-0 mr-2 b-0 rounded-br-lg w-10 h-10 bg-slate-200 text-black toggleSidebar"> - </button>
-            <span class="fpsCounter"> -- </span> fps</h1>
-            <canvas class="w-full h-full" style="image-rendering: pixelated;"></canvas>
+            <h1 class="absolute left-0 top-0 text-white z-20">
+                <button class="m-0 mr-2 b-0 rounded-br-lg w-10 h-10 bg-slate-200 text-black toggleSidebar"> - </button>
+                <span class="fpsCounter"> -- </span> 
+                fps
+            </h1>
+            <button 
+                class="absolute right-0 top-0 z-20 m-0 b-0 rounded-bl-lg p-2 w-fit h-fit bg-slate-200 text-black toggleSidebar"
+                onclick="if (renderLoop == null) {startRendering()} else {stopRendering()}"
+            > Pause/Play </button>
+            <canvas id="canvas" class="w-full h-full" style="image-rendering: pixelated;"></canvas>
+            <div class="absolute left-0 top-0 flex items-center w-full h-full z-10 pausedOverlay" style="background: #fff4;"></div>
         </div>
         <script src="scripts/index.js"></script>
         <script src="scripts/cameraState.js"></script>
