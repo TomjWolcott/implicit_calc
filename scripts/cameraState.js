@@ -38,7 +38,8 @@ const getInitCameraState = (
         maxDepth: 4,
         opacityLayers: 1,
         zoom: 1,
-        flags: !cameraStateFlags.border
+        flags: !cameraStateFlags.border,
+        opacity: 0.8
     }
 }
 

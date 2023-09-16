@@ -2,6 +2,7 @@
 const pi: f32 = 3.1415;
 const border_color: vec4<f32> = vec4(1, 1, 1, 1);
 const border_width: f32 = 1;
+const EPSILON: f32 = 0.001;
 
 const eq_colors: array<vec4<f32>, 8> = array(
     vec4(0.6, 0.3, 0.3, 1),
@@ -35,17 +36,20 @@ struct cameraState {
 struct DepthInfo {
     percent_depth: f32,
     intersected_id: u32
+    // info: vec2<u32>
+    // split up into camera_state.opacity_layers pieces with each piece 
+    // having 4 bits for an id of the intersected eq and the rest for the percent depth
 }
+
+// example with camera_state.opactiy_layers = 3;
+// 21 bits each with one left over, each section has for 4 bits for the id and a depth percent 
+// 0001 00001000000000111  0010 00101100001010010  0000 00000000000000000  0
 
 @group(0) @binding(1) var<storage, read_write> depth_info: array<DepthInfo>;
 
-@compute @workgroup_size(4, 4) // arbitrary choice
+@compute @workgroup_size(16, 16) // arbitrary choice
 fn calculate_depths(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    // if (global_id.x >= u32(camera_state.width) || global_id.y >= u32(camera_state.width)) {
-    //     return;
-    // }
-
-    let perspective_dist: f32 = 1.0;
+    let perspective_dist: f32 = 3.0;
     let global_index = global_id.x + global_id.y * u32(camera_state.width);
     var d: f32 = camera_state.initial_depth;
     let scale = min(camera_state.width, camera_state.height);
@@ -149,17 +153,14 @@ fn calculate_depths(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     var increment_depth: f32 = camera_state.increment_depth;
 
-    if (depth_info[global_index].percent_depth > 0.99) {
-        increment_depth *= 500000;
-    }
-    
-    var prev_difference0: f32 = 0;
+    // if (depth_info[global_index].percent_depth > 0.99) {
+    //     increment_depth *= 500000;
+    // }
 
-var prev_difference1: f32 = 0;
-
-var prev_difference2: f32 = 0;
-
-var prev_difference3: f32 = 0;
+    // let size = u32(64 / camera_state.opacity_layers);
+    // var info: vec2<f32> = vec2(0, 0);
+    // var in_a_row: bool = false;
+    // var opacity_layers_used: u32 = 0;
 
     loop {
         let t0: f32 = 
@@ -187,71 +188,10 @@ var prev_difference3: f32 = 0;
         }
 
         
-            let f0_test = f0(t0,t1,t2,t3,t4,t5);
-            let f1_test = f1(t0,t1,t2,t3,t4,t5);
-
-            if ((
-        (f0_test == f1_test) || 
-        (f0_test - f1_test) * prev_difference0 < 0
-    )) {
+            if (_f0(t0,t1,t2,t3,t4,t5)) {
                 intersected_id = 1;
                 break;
             }
-        
-
-
-            let f2_test = f2(t0,t1,t2,t3,t4,t5);
-            let f3_test = f3(t0,t1,t2,t3,t4,t5);
-
-            if ((
-        (f2_test == f3_test) || 
-        (f2_test - f3_test) * prev_difference1 < 0
-    )) {
-                intersected_id = 2;
-                break;
-            }
-        
-
-
-            let f4_test = f4(t0,t1,t2,t3,t4,t5);
-            let f5_test = f5(t0,t1,t2,t3,t4,t5);
-
-            if ((
-        (f4_test == f5_test) || 
-        (f4_test - f5_test) * prev_difference2 < 0
-    )) {
-                intersected_id = 3;
-                break;
-            }
-        
-
-
-            let f6_test = f6(t0,t1,t2,t3,t4,t5);
-            let f7_test = f7(t0,t1,t2,t3,t4,t5);
-
-            if ((
-        (f6_test == f7_test) || 
-        (f6_test - f7_test) * prev_difference3 < 0
-    )) {
-                intersected_id = 4;
-                break;
-            }
-        
-
-        
-            prev_difference0 = sign(f0_test - f1_test);
-        
-
-
-            prev_difference1 = sign(f2_test - f3_test);
-        
-
-
-            prev_difference2 = sign(f4_test - f5_test);
-        
-
-
-            prev_difference3 = sign(f6_test - f7_test);
         
 
         d += increment_depth;
@@ -262,6 +202,14 @@ var prev_difference3: f32 = 0;
         intersected_id
     );
 }
+
+// fn add_to_info(intersection_id: u32, depth: f32, layer_index: u32, info: ptr<function, vec2<f32>>) {
+//     let size = u32(64 / camera_state.opacity_layers);
+
+//     (*info).x = (*info).x | 
+//         ((intersection_id & 15) << (layer_index * size)) | 
+//         ((u32(depth * pow(2, size - 4)) & 0xfffffff0) << (layer_index * size))
+// }
 
 @vertex
 fn vertex_main(@location(0) pos: vec2<f32>) -> @builtin(position) vec4<f32> {
@@ -322,32 +270,14 @@ fn get_depth_info(x: f32, y: f32) -> DepthInfo {
 }
 
 
+        fn f(x: f32) -> f32 {
+            return select(0.01, select(1.01, -100, (abs(x) < 0.6)), (abs(x) < 0.5));
+        }
+    
 
-fn f0(x: f32, y: f32, z: f32, w: f32, _x4: f32, _x5: f32) -> f32 {
-    return f(x,y);
-}
-fn f1(x: f32, y: f32, z: f32, w: f32, _x4: f32, _x5: f32) -> f32 {
-    return (pow(x,30)+pow(y,30)+pow(z,30));
-}
 
-fn f2(x: f32, y: f32, z: f32, w: f32, _x4: f32, _x5: f32) -> f32 {
-    return g(a);
-}
-fn f3(x: f32, y: f32, z: f32, w: f32, _x4: f32, _x5: f32) -> f32 {
-    return pow((pow((pow(a,30)+pow(b,30)),(1.0/30))+-0.4),30);
-}
-
-fn f4(x: f32, y: f32, z: f32, w: f32, _x4: f32, _x5: f32) -> f32 {
-    return h(x,y);
-}
-fn f5(x: f32, y: f32, z: f32, w: f32, _x4: f32, _x5: f32) -> f32 {
-    return (f(x,y)+g(x)+g(x)+g(y));
-}
-
-fn f6(x: f32, y: f32, z: f32, w: f32, _x4: f32, _x5: f32) -> f32 {
-    return pow(0.3,30);
-}
-fn f7(x: f32, y: f32, z: f32, w: f32, _x4: f32, _x5: f32) -> f32 {
-    return h(x,y);
-}
+            fn _f0(x: f32,y: f32,z: f32,w: f32,_x4: f32,_x5: f32) -> bool {
+                return (1 < (f(x)+f(y)+f(z)));
+            }
+        
     

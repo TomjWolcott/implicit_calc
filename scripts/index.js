@@ -1,13 +1,12 @@
 const wgsl = () => {
     const indices = cameraState.x.map((_, i) => i);
-    let eqEnviroment = getEqEnviroment();
-
-    console.log(eqEnviroment);
+    const { definitions, implicitEquations } = getEqEnviroment2();
     
     return `
         const pi: f32 = 3.1415;
         const border_color: vec4<f32> = vec4(1, 1, 1, 1);
         const border_width: f32 = 1;
+        const EPSILON: f32 = 0.001;
         
         const eq_colors: array<vec4<f32>, 8> = array(
             vec4(0.6, 0.3, 0.3, 1),
@@ -33,7 +32,8 @@ const wgsl = () => {
             width: f32,
             height: f32,
             time: f32,
-            flags: u32
+            flags: u32,
+            opacity: f32
         }
 
         @group(0) @binding(0) var<uniform> camera_state: cameraState;
@@ -91,8 +91,6 @@ const wgsl = () => {
             // if (depth_info[global_index].percent_depth > 0.99) {
             //     increment_depth *= 500000;
             // }
-            
-            ${eqEnviroment.implicitEquations.map((_, i) => `var prev_difference${i}: f32 = 0;`).join("\n\n")}
 
             // let size = u32(64 / camera_state.opacity_layers);
             // var info: vec2<f32> = vec2(0, 0);
@@ -109,18 +107,14 @@ const wgsl = () => {
                     break;
                 }
 
-                ${eqEnviroment.implicitEquations.map(({ test, name1, name2 }, i) => `
-                    let ${name1}_test = ${name1}(${indices.map(i => `t${i}`).join(",")});
-                    let ${name2}_test = ${name2}(${indices.map(i => `t${i}`).join(",")});
+                // let r = psuedo_rng(psuedo_rng(norm_pos.x, 3) + psuedo_rng(norm_pos.y, 3) + psuedo_rng(d, 3) + psuedo_rng(camera_state.time, 3), 3);
+                let r: f32 = 0;
 
-                    if (${test}) {
+                ${implicitEquations.map(({ name }, i) => `
+                    if (r < camera_state.opacity && ${name}(${indices.map(i => `t${i}`).join(",")})) {
                         intersected_id = ${i + 1};
                         break;
                     }
-                `).join("\n\n")}
-
-                ${eqEnviroment.implicitEquations.map(({name1, name2}, i) => `
-                    prev_difference${i} = sign(${name1}_test - ${name2}_test);
                 `).join("\n\n")}
 
                 d += increment_depth;
@@ -139,6 +133,17 @@ const wgsl = () => {
         //         ((intersection_id & 15) << (layer_index * size)) | 
         //         ((u32(depth * pow(2, size - 4)) & 0xfffffff0) << (layer_index * size))
         // }
+
+
+        fn psuedo_rng(seed: f32, iter_count: u32) -> f32 {
+            var result: f32 = seed;
+        
+            for (var i: u32 = 0; i < iter_count; i++) {
+                result = (11.39432 * result) % 1;
+            }
+        
+            return result;
+        }
 
         @vertex
         fn vertex_main(@location(0) pos: vec2<f32>) -> @builtin(position) vec4<f32> {
@@ -198,8 +203,8 @@ const wgsl = () => {
             return depth_info[u32(x) + u32(y) * u32(camera_state.width)];
         }
 
-        ${eqEnviroment.definitions.map(({ fn }) => fn).join("\n\n")}
+        ${definitions.join("\n\n")}
 
-        ${eqEnviroment.implicitEquations.map(({ f1, f2 }) => f1 + "\n" + f2).join("\n\n")}
+        ${implicitEquations.map(({ fn }) => fn).join("\n\n")}
     `.replaceAll("\n        ", "\n");
 };

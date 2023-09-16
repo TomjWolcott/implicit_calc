@@ -285,19 +285,19 @@ const rotateRotator = () => {
 // ------------------------------------------ save/load settings
 const eqDivider = "|||||"
 
-window.onunload = (e) => {
-    window.localStorage.setItem("eqs", 
-        [...document.querySelectorAll(".eqInputs math-field")]
-            .map(field => field.value)
-            .join(eqDivider)
-    );
-}
+// window.onunload = (e) => {
+//     window.localStorage.setItem("eqs", 
+//         [...document.querySelectorAll(".eqInputs math-field")]
+//             .map(field => field.value)
+//             .join(eqDivider)
+//     );
+// }
 
-window.onload = (e) => {
-    let storedInfo = window.localStorage.getItem("eqs");
+// window.onload = (e) => {
+//     let storedInfo = window.localStorage.getItem("eqs");
 
-    if (storedInfo != null && storedInfo != "")
-        storedInfo
-            .split(eqDivider)
-            .forEach(eq => addEq(eq));
-}
+//     if (storedInfo != null && storedInfo != "")
+//         storedInfo
+//             .split(eqDivider)
+//             .forEach(eq => addEq(eq));
+// }

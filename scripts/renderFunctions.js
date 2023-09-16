@@ -152,7 +152,7 @@ const render = async () => {
         cameraState.initialDepth, cameraState.incrementDepth,
         cameraState.maxDepth, cameraState.opacityLayers,
         cameraState.zoom, canvas.width, canvas.height, 
-        Date.now() % (2**31), cameraState.flags,
+        Date.now() % (2**31), cameraState.flags, cameraState.opacity,
         0, 0, 0, 0, 0, 0, 0 // A bunch of zeros for padding the buffer
     ]);
 
