@@ -81,7 +81,7 @@ const loadWgsl = () => {
     const {
         device, canvasFormat, vertexBufferLayout, bindGroupLayout
     } = rendererInfo;
-
+    console.log(getEqEnviroment2);
     const shaderModule = device.createShaderModule({
         label: "shader",
         code: wgsl()

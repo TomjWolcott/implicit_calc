@@ -91,14 +91,14 @@ const preprocess = (eq, functionNames = []) => {
 };
 
 const computeEngine = new ComputeEngine.ComputeEngine();
-computeEngine.defineFunction("m", {
-    complexity: 2800,
-    hold: "none",
-    signature: {
-        domain: "RealNumber",
-        evaluate: x => x
-    }
-});
+// computeEngine.defineFunction("m", {
+//     complexity: 2800,
+//     hold: "none",
+//     signature: {
+//         domain: "RealNumber",
+//         evaluate: x => x
+//     }
+// });
 
 //$$ \left(\sqrt{x^2+y^2}-0.4\right)^2+\left(z+0.2\tan^{-1}\left(\frac{y}{x}\right)\right)^2=0.05^2 $$
 
